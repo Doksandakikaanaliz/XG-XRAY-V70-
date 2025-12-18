@@ -21785,7 +21785,7 @@ Sadece oranları listele, başka bir şey yazma."""
         """Programı yeniden başlat"""
         try:
             # Verileri kaydet
-            self.veritabani_kaydet()
+            self.db_kaydet()
             self.ayarlar_kaydet()
             
             # Python yorumlayıcısını ve dosyayı al
