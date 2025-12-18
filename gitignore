@@ -1,0 +1,42 @@
+# ═══════════════════════════════════════════════════════════
+# 🔐 XG-XRAY GÜVENLİK - HASSAS DOSYALAR
+# ═══════════════════════════════════════════════════════════
+# ⚠️ BU DOSYALAR ASLA GITHUB'A YÜKLENMEMELİ!
+
+# Config dosyası (API key, Telegram token, vb.)
+config.json
+
+# Ayarlar ve kullanıcı verileri
+ayarlar.json
+mac_veritabani.json
+performans.json
+ogrenme.json
+bahis_takip.xlsx
+marka_ayarlari.json
+laboratuvar.json
+telegram_kanallari.json
+oran_takip.json
+tarama_log.json
+canli_bahis.json
+sekme_siralama.json
+kara_liste.json
+altin_liste.json
+gorev_listesi.json
+haftalik_rapor.json
+
+# Geçici dosyalar
+*.backup
+pano_*.png
+temp_*
+skor_*
+*.pyc
+__pycache__/
+
+# IDE dosyaları
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Log dosyaları
+*.log
