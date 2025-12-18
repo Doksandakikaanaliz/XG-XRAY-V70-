@@ -41,7 +41,7 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 # 🔄 VERSİYON VE GÜNCELLEME SİSTEMİ
 # ═══════════════════════════════════════════════════════════════════════════════
-APP_VERSION = "70.1.1"  # Major.Minor.Patch formatı
+APP_VERSION = "70.1.2"  # Major.Minor.Patch formatı
 APP_NAME = "XG-XRAY Commander"
 BUILD_DATE = "2025-12-19"
 
@@ -98,41 +98,63 @@ except ImportError:
 # ⚠️ config.json ASLA GitHub'a YÜKLENMEMELİ!
 # ⚠️ .gitignore dosyasına config.json eklenmeli!
 
-# Base dizini belirle - veritabanının olduğu yeri tercih et
+# Base dizini belirle - EXE ve Script için farklı çalışır
 def _get_base_dir():
-    """Program dizinini bul - önce veritabanının olduğu yere bak"""
+    """Program dizinini bul - EXE ve Script için uyumlu"""
+    import sys
+    
     fixed_dir = r"C:\Users\Apo\Desktop\FutbolAnaliz"
-    script_dir = os.path.dirname(os.path.abspath(__file__))
     
-    # 1. Önce sabit dizinde veritabanı var mı?
-    if os.path.exists(os.path.join(fixed_dir, "mac_veritabani.json")):
-        print(f"📁 Veritabanı bulundu: {fixed_dir}")
+    # EXE olarak mı çalışıyor?
+    if getattr(sys, 'frozen', False):
+        # PyInstaller EXE - EXE'nin bulunduğu dizin
+        exe_dir = os.path.dirname(sys.executable)
+        print(f"🔷 EXE modu - Dizin: {exe_dir}")
+        
+        # EXE dizininde config var mı?
+        if os.path.exists(os.path.join(exe_dir, "config.json")):
+            print(f"✅ Config bulundu (EXE dizini): {exe_dir}")
+            return exe_dir
+        
+        # Sabit dizinde config var mı?
+        if os.path.exists(os.path.join(fixed_dir, "config.json")):
+            print(f"✅ Config bulundu (sabit dizin): {fixed_dir}")
+            return fixed_dir
+        
+        # EXE dizinini kullan
+        return exe_dir
+    else:
+        # Normal Python script
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        print(f"🔷 Script modu - Dizin: {script_dir}")
+        
+        # 1. Sabit dizinde veritabanı var mı?
+        if os.path.exists(os.path.join(fixed_dir, "mac_veritabani.json")):
+            print(f"✅ Veritabanı bulundu: {fixed_dir}")
+            return fixed_dir
+        
+        # 2. Sabit dizinde config var mı?
+        if os.path.exists(os.path.join(fixed_dir, "config.json")):
+            print(f"✅ Config bulundu: {fixed_dir}")
+            return fixed_dir
+        
+        # 3. Sabit dizin var mı?
+        if os.path.exists(fixed_dir):
+            return fixed_dir
+        
+        # 4. Script dizininde config var mı?
+        if os.path.exists(os.path.join(script_dir, "config.json")):
+            return script_dir
+        
+        # 5. Sabit dizini oluştur
+        os.makedirs(fixed_dir, exist_ok=True)
         return fixed_dir
-    
-    # 2. Sabit dizinde config var mı?
-    if os.path.exists(os.path.join(fixed_dir, "config.json")):
-        print(f"📁 Config bulundu: {fixed_dir}")
-        return fixed_dir
-    
-    # 3. Sabit dizin var mı?
-    if os.path.exists(fixed_dir):
-        print(f"📁 Sabit dizin kullanılıyor: {fixed_dir}")
-        return fixed_dir
-    
-    # 4. Programın dizininde config var mı?
-    if os.path.exists(os.path.join(script_dir, "config.json")):
-        print(f"📁 Program dizini kullanılıyor: {script_dir}")
-        return script_dir
-    
-    # 5. Yoksa sabit dizini oluştur
-    os.makedirs(fixed_dir, exist_ok=True)
-    print(f"📁 Yeni dizin oluşturuldu: {fixed_dir}")
-    return fixed_dir
 
 BASE_DIR = _get_base_dir()
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 
 # Debug: Config dosyası yolunu göster
+print(f"📁 BASE_DIR: {BASE_DIR}")
 print(f"📁 Config dosyası: {CONFIG_FILE}")
 print(f"📁 Config mevcut: {os.path.exists(CONFIG_FILE)}")
 
