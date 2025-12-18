@@ -41,7 +41,7 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 # 🔄 VERSİYON VE GÜNCELLEME SİSTEMİ
 # ═══════════════════════════════════════════════════════════════════════════════
-APP_VERSION = "70.1.0"  # Major.Minor.Patch formatı
+APP_VERSION = "70.1.1"  # Major.Minor.Patch formatı
 APP_NAME = "XG-XRAY Commander"
 BUILD_DATE = "2025-12-19"
 
@@ -21730,12 +21730,27 @@ Sadece oranları listele, başka bir şey yazma."""
             self._guncelleme_indir()
     
     def _guncelleme_indir(self):
-        """GitHub'dan güncellemeyi indir"""
-        self.lbl_update_status.config(text="⬇️ İndiriliyor...", fg="#ffff00")
+        """GitHub'dan güncellemeyi indir - önce versiyon kontrolü yap"""
+        self.lbl_update_status.config(text="🔍 Kontrol ediliyor...", fg="#ffff00")
         self.root.update()
         
         def indir_thread():
             try:
+                # Önce versiyon kontrolü yap
+                version_response = requests.get(GITHUB_VERSION_URL, timeout=10)
+                
+                if version_response.status_code == 200:
+                    remote_version = version_response.text.strip()
+                    
+                    # Eğer zaten güncelse indirme yapma
+                    if not self._versiyon_karsilastir(remote_version, APP_VERSION):
+                        self.root.after(0, lambda: self._zaten_guncel())
+                        return
+                
+                # Güncelleme var, indir
+                self.root.after(0, lambda: self.lbl_update_status.config(
+                    text="⬇️ İndiriliyor...", fg="#ffff00"))
+                
                 # GitHub'dan dosyayı indir
                 response = requests.get(GITHUB_RAW_URL, timeout=30)
                 
@@ -21766,6 +21781,15 @@ Sadece oranları listele, başka bir şey yazma."""
                     text=f"❌ Hata: {str(e)[:30]}", fg="#ff6666"))
         
         threading.Thread(target=indir_thread, daemon=True).start()
+    
+    def _zaten_guncel(self):
+        """Zaten güncel mesajı"""
+        self.lbl_update_status.config(text=f"✅ Zaten güncel! (v{APP_VERSION})", fg="#00ff00")
+        messagebox.showinfo(
+            "✅ Zaten Güncelsiniz!",
+            f"Programınız zaten en güncel sürümde.\n\n"
+            f"Mevcut versiyon: v{APP_VERSION}"
+        )
     
     def _guncelleme_tamamlandi(self):
         """Güncelleme tamamlandı bildirimi"""
