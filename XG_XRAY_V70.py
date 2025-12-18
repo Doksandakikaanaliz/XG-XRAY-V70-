@@ -46,8 +46,8 @@ APP_NAME = "XG-XRAY Commander"
 BUILD_DATE = "2025-12-19"
 
 # GitHub Ayarları - KENDİ REPO BİLGİLERİNİZİ GİRİN
-GITHUB_USER = "KULLANICI_ADINIZ"  # GitHub kullanıcı adınız
-GITHUB_REPO = "XG-XRAY-V70"       # Repo adınız
+GITHUB_USER = "Doksandakikaanaliz"  # GitHub kullanıcı adınız
+GITHUB_REPO = "XG-XRAY-V70-"       # Repo adınız
 GITHUB_BRANCH = "main"            # Ana branch (main veya master)
 GITHUB_FILE = "XG_XRAY_V70.py"    # Ana dosya adı
 
