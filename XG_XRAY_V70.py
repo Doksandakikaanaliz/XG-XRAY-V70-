@@ -41,7 +41,7 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 # 🔄 VERSİYON VE GÜNCELLEME SİSTEMİ
 # ═══════════════════════════════════════════════════════════════════════════════
-APP_VERSION = "70.2.0"  # Major.Minor.Patch formatı
+APP_VERSION = "70.2.2"  # Major.Minor.Patch formatı
 APP_NAME = "XG-XRAY Commander"
 BUILD_DATE = "2025-12-19"
 
@@ -54,6 +54,7 @@ GITHUB_FILE = "XG_XRAY_V70.py"    # Ana dosya adı
 # Otomatik URL oluştur
 GITHUB_RAW_URL = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/{GITHUB_BRANCH}/{GITHUB_FILE}"
 GITHUB_VERSION_URL = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/{GITHUB_BRANCH}/version.txt"
+GITHUB_CHANGELOG_URL = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/{GITHUB_BRANCH}/CHANGELOG.txt"
 # ═══════════════════════════════════════════════════════════════════════════════
 
 import tkinter as tk
@@ -7884,6 +7885,18 @@ class XrayCommanderV70:
         else:
             selamlama = "İyi akşamlar"
         
+        # Yeni güncelleme kontrolü
+        update_flag = os.path.join(BASE_DIR, ".update_installed")
+        if os.path.exists(update_flag):
+            # Güncelleme yeni yapılmış - notları göster
+            try:
+                os.remove(update_flag)  # Flag'i sil
+                self.root.after(100, self._guncelleme_notlari_goster)
+                return  # Hoşgeldin mesajı yerine güncelleme notlarını göster
+            except:
+                pass
+        
+        # Normal hoşgeldin mesajı
         messagebox.showinfo(
             "👋 Hoş Geldiniz!",
             f"{selamlama}!\n\n"
@@ -7891,6 +7904,58 @@ class XrayCommanderV70:
             f"📊 {len(self.mac_db)} maç arşivde\n\n"
             f"Başarılı analizler dileriz! ⚽"
         )
+    
+    def _guncelleme_notlari_goster(self):
+        """Güncelleme sonrası notları popup olarak göster"""
+        changelog_file = os.path.join(BASE_DIR, "CHANGELOG.txt")
+        
+        notlar = ""
+        if os.path.exists(changelog_file):
+            try:
+                with open(changelog_file, 'r', encoding='utf-8') as f:
+                    notlar = f.read()
+            except:
+                notlar = "Güncelleme notları okunamadı."
+        else:
+            notlar = "Güncelleme notları bulunamadı."
+        
+        # Popup oluştur
+        popup = tk.Toplevel(self.root)
+        popup.title(f"🎉 Güncelleme Tamamlandı! - V{APP_VERSION}")
+        popup.geometry("600x500")
+        popup.configure(bg=ModernTheme.BG_PRIMARY)
+        popup.transient(self.root)
+        popup.grab_set()
+        
+        # Başlık
+        tk.Label(popup, text="🎉 YENİ GÜNCELLEME YÜKLENDİ!", 
+                font=("Segoe UI", 16, "bold"),
+                bg=ModernTheme.BG_PRIMARY, fg="#00ff00").pack(pady=15)
+        
+        tk.Label(popup, text=f"XG-XRAY Commander V{APP_VERSION}", 
+                font=("Segoe UI", 12),
+                bg=ModernTheme.BG_PRIMARY, fg=ModernTheme.TEXT_PRIMARY).pack()
+        
+        # Notlar
+        tk.Label(popup, text="📋 GÜNCELLEME NOTLARI:", 
+                font=("Segoe UI", 11, "bold"),
+                bg=ModernTheme.BG_PRIMARY, fg=ModernTheme.ACCENT_PRIMARY).pack(pady=(20, 5), anchor="w", padx=20)
+        
+        txt_frame = tk.Frame(popup, bg=ModernTheme.BG_PRIMARY)
+        txt_frame.pack(fill="both", expand=True, padx=20, pady=5)
+        
+        txt = scrolledtext.ScrolledText(txt_frame, wrap="word", 
+                                        bg=ModernTheme.BG_CARD, fg=ModernTheme.TEXT_PRIMARY,
+                                        font=("Consolas", 10), height=15)
+        txt.pack(fill="both", expand=True)
+        txt.insert("1.0", notlar)
+        txt.config(state="disabled")
+        
+        # Tamam butonu
+        tk.Button(popup, text="✅ TAMAM", command=popup.destroy,
+                 bg=ModernTheme.ACCENT_SUCCESS, fg="white",
+                 font=("Segoe UI", 11, "bold"),
+                 relief="flat", padx=30, pady=8).pack(pady=20)
     
     def _fil_hafizasi_yukle(self):
         """V70: FİL HAFIZASI - mac_db'yi mac_arsivi sözlüğüne dönüştür"""
@@ -11856,6 +11921,10 @@ GÜNCELLE butonuna bastığınızda:
                                         bg=ModernTheme.BG_CARD, fg="#00d4ff", cursor="hand2")
         self.lbl_github_url.pack(side="left")
         self.lbl_github_url.bind("<Button-1>", lambda e: self._github_ac())
+        
+        # Güncelleme notları butonu
+        tk.Button(update_row3, text="📋 GÜNCELLEME NOTLARI", command=self._guncelleme_notlari_ac,
+                  bg="#6366f1", fg="white", relief="flat").pack(side="right", padx=5)
         
         # ═══════════════════════════════════════════════════════════
         
@@ -21734,84 +21803,21 @@ Sadece oranları listele, başka bir şey yazma."""
     # AYARLAR FONKSİYONLARI
     # ═══════════════════════════════════════════════════════════
     def tema_degistir(self, tema):
-        """Tema değiştir - ANINDA uygula"""
+        """Tema değiştir - kaydet ve yeniden başlatma seçeneği sun"""
         self.current_theme = tema
         self.theme = THEMES[tema]
         self.ayarlar_kaydet()
         
-        # ═══════════════════════════════════════════════════════════════
-        # ANINDA TEMA DEĞİŞİKLİĞİ
-        # ═══════════════════════════════════════════════════════════════
-        try:
-            # ModernTheme sınıfını güncelle
-            if tema == "🌙 Koyu":
-                ModernTheme.BG_PRIMARY = "#0a0f1c"
-                ModernTheme.BG_SECONDARY = "#111827"
-                ModernTheme.BG_CARD = "#1e293b"
-                ModernTheme.TEXT_PRIMARY = "#ffffff"
-                ModernTheme.TEXT_SECONDARY = "#94a3b8"
-                ModernTheme.TEXT_MUTED = "#64748b"
-                ModernTheme.ACCENT_PRIMARY = "#3b82f6"
-            elif tema == "☀️ Açık":
-                ModernTheme.BG_PRIMARY = "#f8fafc"
-                ModernTheme.BG_SECONDARY = "#e2e8f0"
-                ModernTheme.BG_CARD = "#ffffff"
-                ModernTheme.TEXT_PRIMARY = "#1e293b"
-                ModernTheme.TEXT_SECONDARY = "#475569"
-                ModernTheme.TEXT_MUTED = "#94a3b8"
-                ModernTheme.ACCENT_PRIMARY = "#2563eb"
-            elif tema == "🔵 Mavi":
-                ModernTheme.BG_PRIMARY = "#0c1929"
-                ModernTheme.BG_SECONDARY = "#0f2744"
-                ModernTheme.BG_CARD = "#163a5f"
-                ModernTheme.TEXT_PRIMARY = "#e0f2fe"
-                ModernTheme.TEXT_SECONDARY = "#7dd3fc"
-                ModernTheme.TEXT_MUTED = "#38bdf8"
-                ModernTheme.ACCENT_PRIMARY = "#0ea5e9"
-            elif tema == "🟣 Mor":
-                ModernTheme.BG_PRIMARY = "#1a0a2e"
-                ModernTheme.BG_SECONDARY = "#2d1b4e"
-                ModernTheme.BG_CARD = "#3d2a5e"
-                ModernTheme.TEXT_PRIMARY = "#f3e8ff"
-                ModernTheme.TEXT_SECONDARY = "#c4b5fd"
-                ModernTheme.TEXT_MUTED = "#a78bfa"
-                ModernTheme.ACCENT_PRIMARY = "#8b5cf6"
-            
-            # Ana pencere
-            self.root.configure(bg=ModernTheme.BG_PRIMARY)
-            
-            # Tüm widget'ları recursive güncelle
-            self._update_widget_theme(self.root)
-            
-            messagebox.showinfo("✅ Tema Değişti", f"{tema} teması uygulandı!")
-            
-        except Exception as e:
-            print(f"Tema değiştirme hatası: {e}")
-            messagebox.showinfo("Tema", f"✅ {tema} teması seçildi.\nTam uygulama için programı yeniden başlatın.")
-    
-    def _update_widget_theme(self, widget):
-        """Widget ve alt widget'ların temasını güncelle"""
-        try:
-            widget_type = widget.winfo_class()
-            
-            if widget_type in ("Frame", "Labelframe"):
-                widget.configure(bg=ModernTheme.BG_PRIMARY)
-            elif widget_type == "Label":
-                widget.configure(bg=ModernTheme.BG_PRIMARY, fg=ModernTheme.TEXT_PRIMARY)
-            elif widget_type == "Button":
-                widget.configure(bg=ModernTheme.BG_CARD, fg=ModernTheme.TEXT_PRIMARY)
-            elif widget_type == "Entry":
-                widget.configure(bg=ModernTheme.BG_CARD, fg=ModernTheme.TEXT_PRIMARY)
-            elif widget_type == "Text":
-                widget.configure(bg=ModernTheme.BG_CARD, fg=ModernTheme.TEXT_PRIMARY)
-            elif widget_type == "Canvas":
-                widget.configure(bg=ModernTheme.BG_PRIMARY)
-        except:
-            pass
+        # Kullanıcıya sor
+        cevap = messagebox.askyesno(
+            "🎨 Tema Değişti",
+            f"{tema} teması kaydedildi!\n\n"
+            "Temanın tam olarak uygulanması için\n"
+            "programı yeniden başlatmak ister misiniz?"
+        )
         
-        # Alt widget'ları güncelle
-        for child in widget.winfo_children():
-            self._update_widget_theme(child)
+        if cevap:
+            self._programi_yeniden_baslat()
     
     # ═══════════════════════════════════════════════════════════
     # 🔄 GÜNCELLEME SİSTEMİ FONKSİYONLARI
@@ -21925,6 +21931,15 @@ Sadece oranları listele, başka bir şey yazma."""
                 # GitHub'dan dosyayı indir
                 response = requests.get(GITHUB_RAW_URL, timeout=30)
                 
+                # Changelog'u da indir
+                changelog_text = ""
+                try:
+                    changelog_response = requests.get(GITHUB_CHANGELOG_URL, timeout=10)
+                    if changelog_response.status_code == 200:
+                        changelog_text = changelog_response.text
+                except:
+                    pass
+                
                 if response.status_code == 200:
                     # Mevcut dosyanın yolunu bul
                     current_file = os.path.abspath(__file__)
@@ -21940,6 +21955,17 @@ Sadece oranları listele, başka bir şey yazma."""
                     # Yeni dosyayı kaydet
                     with open(current_file, 'w', encoding='utf-8') as f:
                         f.write(response.text)
+                    
+                    # Changelog'u kaydet
+                    if changelog_text:
+                        changelog_file = os.path.join(BASE_DIR, "CHANGELOG.txt")
+                        with open(changelog_file, 'w', encoding='utf-8') as f:
+                            f.write(changelog_text)
+                        
+                        # Yeni güncelleme olduğunu işaretle
+                        update_flag = os.path.join(BASE_DIR, ".update_installed")
+                        with open(update_flag, 'w') as f:
+                            f.write(remote_version)
                     
                     self.root.after(0, lambda: self._guncelleme_tamamlandi())
                 else:
@@ -22002,6 +22028,94 @@ Sadece oranları listele, başka bir şey yazma."""
         """GitHub sayfasını tarayıcıda aç"""
         import webbrowser
         webbrowser.open(f"https://github.com/{GITHUB_USER}/{GITHUB_REPO}")
+    
+    def _guncelleme_notlari_ac(self):
+        """Güncelleme notlarını popup'ta göster"""
+        changelog_file = os.path.join(BASE_DIR, "CHANGELOG.txt")
+        
+        notlar = ""
+        if os.path.exists(changelog_file):
+            try:
+                with open(changelog_file, 'r', encoding='utf-8') as f:
+                    notlar = f.read()
+            except:
+                notlar = "Güncelleme notları okunamadı."
+        else:
+            # GitHub'dan çek
+            try:
+                response = requests.get(GITHUB_CHANGELOG_URL, timeout=10)
+                if response.status_code == 200:
+                    notlar = response.text
+                    # Kaydet
+                    with open(changelog_file, 'w', encoding='utf-8') as f:
+                        f.write(notlar)
+                else:
+                    notlar = "Güncelleme notları bulunamadı.\n\nGitHub'dan indirmek için internet bağlantısı gerekli."
+            except:
+                notlar = "Güncelleme notları yüklenemedi.\n\nLütfen internet bağlantınızı kontrol edin."
+        
+        # Popup oluştur
+        popup = tk.Toplevel(self.root)
+        popup.title(f"📋 Güncelleme Notları - V{APP_VERSION}")
+        popup.geometry("650x550")
+        popup.configure(bg=ModernTheme.BG_PRIMARY)
+        popup.transient(self.root)
+        popup.grab_set()
+        
+        # Başlık
+        tk.Label(popup, text="📋 GÜNCELLEME NOTLARI", 
+                font=("Segoe UI", 16, "bold"),
+                bg=ModernTheme.BG_PRIMARY, fg=ModernTheme.ACCENT_PRIMARY).pack(pady=15)
+        
+        tk.Label(popup, text=f"XG-XRAY Commander V{APP_VERSION} | {BUILD_DATE}", 
+                font=("Segoe UI", 11),
+                bg=ModernTheme.BG_PRIMARY, fg=ModernTheme.TEXT_SECONDARY).pack()
+        
+        # Notlar
+        txt_frame = tk.Frame(popup, bg=ModernTheme.BG_PRIMARY)
+        txt_frame.pack(fill="both", expand=True, padx=20, pady=15)
+        
+        txt = scrolledtext.ScrolledText(txt_frame, wrap="word", 
+                                        bg=ModernTheme.BG_CARD, fg=ModernTheme.TEXT_PRIMARY,
+                                        font=("Consolas", 10), height=20)
+        txt.pack(fill="both", expand=True)
+        txt.insert("1.0", notlar)
+        txt.config(state="disabled")
+        
+        # Butonlar
+        btn_frame = tk.Frame(popup, bg=ModernTheme.BG_PRIMARY)
+        btn_frame.pack(pady=15)
+        
+        tk.Button(btn_frame, text="🔄 YENİLE", 
+                 command=lambda: self._changelog_yenile(txt, popup),
+                 bg=ModernTheme.ACCENT_PRIMARY, fg="white",
+                 relief="flat", padx=20, pady=5).pack(side="left", padx=10)
+        
+        tk.Button(btn_frame, text="✅ KAPAT", command=popup.destroy,
+                 bg=ModernTheme.ACCENT_SUCCESS, fg="white",
+                 relief="flat", padx=20, pady=5).pack(side="left", padx=10)
+    
+    def _changelog_yenile(self, txt_widget, popup):
+        """Changelog'u GitHub'dan yenile"""
+        try:
+            response = requests.get(GITHUB_CHANGELOG_URL, timeout=10)
+            if response.status_code == 200:
+                notlar = response.text
+                # Kaydet
+                changelog_file = os.path.join(BASE_DIR, "CHANGELOG.txt")
+                with open(changelog_file, 'w', encoding='utf-8') as f:
+                    f.write(notlar)
+                # Göster
+                txt_widget.config(state="normal")
+                txt_widget.delete("1.0", tk.END)
+                txt_widget.insert("1.0", notlar)
+                txt_widget.config(state="disabled")
+                messagebox.showinfo("✅", "Güncelleme notları yenilendi!")
+            else:
+                messagebox.showerror("Hata", "Güncelleme notları indirilemedi.")
+        except Exception as e:
+            messagebox.showerror("Hata", f"Hata: {e}")
+    
     # ═══════════════════════════════════════════════════════════
     
     def onbellek_temizle(self):
