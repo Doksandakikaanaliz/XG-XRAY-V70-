@@ -41,7 +41,7 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 # 🔄 VERSİYON VE GÜNCELLEME SİSTEMİ
 # ═══════════════════════════════════════════════════════════════════════════════
-APP_VERSION = "70.2.4"  # Major.Minor.Patch formatı
+APP_VERSION = "70.2.5"  # Major.Minor.Patch formatı
 APP_NAME = "XG-XRAY Commander"
 BUILD_DATE = "2025-12-19"
 
@@ -22091,7 +22091,7 @@ Sadece oranları listele, başka bir şey yazma."""
             self.root.after(0, lambda err=str(e): self._exe_guncelleme_hata(err))
     
     def _exe_guncelleme_tamamlandi(self, py_path, exe_dir):
-        """EXE güncelleme tamamlandı - updater.bat ile otomatik EXE oluştur"""
+        """EXE güncelleme - arka planda otomatik EXE oluştur"""
         import sys
         
         try:
@@ -22099,119 +22099,257 @@ Sadece oranları listele, başka bir şey yazma."""
         except:
             pass
         
-        # Kullanıcıya seçenek sun
-        cevap = messagebox.askyesnocancel(
+        # Onay al
+        cevap = messagebox.askyesno(
             "✅ Güncelleme İndirildi!",
-            f"Yeni versiyon başarıyla indirildi!\n\n"
-            f"Ne yapmak istersiniz?\n\n"
-            f"[EVET] → Otomatik yeni EXE oluştur (2-3 dk bekler)\n"
-            f"[HAYIR] → .py dosyasını Python ile çalıştır\n"
-            f"[İPTAL] → Hiçbir şey yapma"
+            f"Yeni versiyon indirildi!\n\n"
+            f"Şimdi otomatik olarak yeni EXE oluşturulacak.\n"
+            f"Bu işlem 2-3 dakika sürebilir.\n\n"
+            f"Devam etmek istiyor musunuz?"
         )
         
-        if cevap is None:  # İptal
+        if not cevap:
             messagebox.showinfo("Bilgi", 
                 f"Güncelleme dosyası indirildi:\n{py_path}\n\n"
-                "İstediğiniz zaman çalıştırabilirsiniz.")
+                "İstediğiniz zaman manuel olarak EXE oluşturabilirsiniz.")
             return
         
-        if cevap:  # Evet - Otomatik EXE oluştur
-            self._exe_otomatik_olustur(py_path, exe_dir)
-        else:  # Hayır - Python ile çalıştır
-            self._py_calistir(py_path)
+        # Arka planda EXE oluştur
+        self._exe_arka_planda_olustur(py_path, exe_dir)
     
-    def _exe_otomatik_olustur(self, py_path, exe_dir):
-        """Updater.bat ile otomatik EXE oluştur"""
+    def _exe_arka_planda_olustur(self, py_path, exe_dir):
+        """Arka planda PyInstaller ile EXE oluştur - progress bar ile"""
         import sys
+        import subprocess
+        
+        # Progress popup oluştur
+        self.build_popup = tk.Toplevel(self.root)
+        self.build_popup.title("🔄 Güncelleme Kuruluyor")
+        self.build_popup.geometry("500x280")
+        self.build_popup.configure(bg=ModernTheme.BG_PRIMARY)
+        self.build_popup.transient(self.root)
+        self.build_popup.grab_set()
+        self.build_popup.resizable(False, False)
+        self.build_popup.protocol("WM_DELETE_WINDOW", lambda: None)  # Kapatmayı engelle
+        
+        # Ortala
+        self.build_popup.update_idletasks()
+        x = (self.build_popup.winfo_screenwidth() - 500) // 2
+        y = (self.build_popup.winfo_screenheight() - 280) // 2
+        self.build_popup.geometry(f"500x280+{x}+{y}")
+        
+        tk.Label(self.build_popup, text="🔄 GÜNCELLEME KURULUYOR", 
+                font=("Segoe UI", 16, "bold"),
+                bg=ModernTheme.BG_PRIMARY, fg=ModernTheme.ACCENT_PRIMARY).pack(pady=20)
+        
+        tk.Label(self.build_popup, text="Lütfen bekleyin, bu işlem 2-3 dakika sürebilir...", 
+                font=("Segoe UI", 10),
+                bg=ModernTheme.BG_PRIMARY, fg=ModernTheme.TEXT_SECONDARY).pack()
+        
+        self.build_status = tk.Label(self.build_popup, text="⏳ Hazırlanıyor...", 
+                font=("Segoe UI", 11),
+                bg=ModernTheme.BG_PRIMARY, fg=ModernTheme.TEXT_PRIMARY)
+        self.build_status.pack(pady=15)
+        
+        # Progress bar
+        self.build_progress = ttk.Progressbar(self.build_popup, length=400, mode='determinate')
+        self.build_progress.pack(pady=10)
+        
+        # Alt bilgi
+        self.build_detail = tk.Label(self.build_popup, text="", 
+                font=("Segoe UI", 9),
+                bg=ModernTheme.BG_PRIMARY, fg=ModernTheme.TEXT_MUTED)
+        self.build_detail.pack(pady=5)
+        
+        tk.Label(self.build_popup, text="⚠️ Bu pencereyi kapatmayın!", 
+                font=("Segoe UI", 9, "bold"),
+                bg=ModernTheme.BG_PRIMARY, fg="#ff6b6b").pack(pady=10)
+        
+        # Arka plan thread'i başlat
+        threading.Thread(target=lambda: self._pyinstaller_calistir(py_path, exe_dir), daemon=True).start()
+    
+    def _pyinstaller_calistir(self, py_path, exe_dir):
+        """PyInstaller'ı arka planda çalıştır"""
+        import subprocess
+        import sys
+        import shutil
         
         current_exe = sys.executable
         
-        # updater.bat içeriği
-        updater_content = f'''@echo off
-chcp 65001 >nul
-echo ════════════════════════════════════════════════
-echo   XG-XRAY OTOMATIK GUNCELLEME
-echo ════════════════════════════════════════════════
-echo.
-echo Lutfen bekleyin, yeni EXE olusturuluyor...
-echo Bu islem 2-3 dakika surebilir.
-echo.
-
-cd /d "{exe_dir}"
-
-echo [1/4] Eski EXE yedekleniyor...
-if exist "XG-XRAY_V70_OLD.exe" del "XG-XRAY_V70_OLD.exe"
-if exist "XG-XRAY_V70.exe" ren "XG-XRAY_V70.exe" "XG-XRAY_V70_OLD.exe"
-
-echo [2/4] Yeni EXE olusturuluyor...
-pyinstaller --onefile --windowed --icon=eye_icon.ico --name "XG-XRAY_V70" XG_XRAY_V70.py
-
-echo [3/4] Dosyalar tasinıyor...
-if exist "dist\\XG-XRAY_V70.exe" (
-    move /Y "dist\\XG-XRAY_V70.exe" "XG-XRAY_V70.exe"
-    echo Yeni EXE basariyla olusturuldu!
-) else (
-    echo HATA: EXE olusturulamadi!
-    if exist "XG-XRAY_V70_OLD.exe" ren "XG-XRAY_V70_OLD.exe" "XG-XRAY_V70.exe"
-    pause
-    exit /b 1
-)
-
-echo [4/4] Temizlik yapiliyor...
-rmdir /s /q build 2>nul
-rmdir /s /q dist 2>nul
-del /q *.spec 2>nul
-if exist "XG-XRAY_V70_OLD.exe" del "XG-XRAY_V70_OLD.exe"
-
-echo.
-echo ════════════════════════════════════════════════
-echo   GUNCELLEME TAMAMLANDI!
-echo ════════════════════════════════════════════════
-echo.
-echo Program baslatiliyor...
-timeout /t 2 >nul
-
-start "" "XG-XRAY_V70.exe"
-exit
-'''
+        try:
+            # Aşama 1: Hazırlık
+            self.root.after(0, lambda: self.build_status.config(text="📁 Eski dosyalar temizleniyor..."))
+            self.root.after(0, lambda: self.build_progress.config(value=5))
+            self.root.after(0, lambda: self.build_detail.config(text="build ve dist klasörleri siliniyor"))
+            
+            # Eski build dosyalarını temizle
+            build_dir = os.path.join(exe_dir, "build")
+            dist_dir = os.path.join(exe_dir, "dist")
+            spec_file = os.path.join(exe_dir, "XG-XRAY_V70.spec")
+            
+            if os.path.exists(build_dir):
+                shutil.rmtree(build_dir, ignore_errors=True)
+            if os.path.exists(dist_dir):
+                shutil.rmtree(dist_dir, ignore_errors=True)
+            if os.path.exists(spec_file):
+                os.remove(spec_file)
+            
+            time.sleep(0.5)
+            
+            # Aşama 2: Yedek al
+            self.root.after(0, lambda: self.build_status.config(text="💾 Eski EXE yedekleniyor..."))
+            self.root.after(0, lambda: self.build_progress.config(value=10))
+            
+            old_exe = os.path.join(exe_dir, "XG-XRAY_V70.exe")
+            backup_exe = os.path.join(exe_dir, "XG-XRAY_V70_YEDEK.exe")
+            
+            if os.path.exists(backup_exe):
+                os.remove(backup_exe)
+            if os.path.exists(old_exe):
+                shutil.copy2(old_exe, backup_exe)
+            
+            time.sleep(0.3)
+            
+            # Aşama 3: PyInstaller çalıştır
+            self.root.after(0, lambda: self.build_status.config(text="🔨 Yeni EXE oluşturuluyor..."))
+            self.root.after(0, lambda: self.build_progress.config(value=15))
+            self.root.after(0, lambda: self.build_detail.config(text="PyInstaller çalışıyor, bu biraz zaman alabilir"))
+            
+            # İkon dosyası kontrolü
+            icon_path = os.path.join(exe_dir, "eye_icon.ico")
+            if not os.path.exists(icon_path):
+                icon_path = os.path.join(exe_dir, "app_icon.ico")
+            
+            # PyInstaller komutu
+            cmd = [
+                sys.executable.replace("XG-XRAY_V70.exe", "python.exe") if "XG-XRAY" in sys.executable else "python",
+                "-m", "PyInstaller",
+                "--onefile",
+                "--windowed",
+                "--name", "XG-XRAY_V70",
+                py_path
+            ]
+            
+            # İkon varsa ekle
+            if os.path.exists(icon_path):
+                cmd.insert(-1, f"--icon={icon_path}")
+            
+            # Windows'ta pencere açmadan çalıştır
+            startupinfo = None
+            if os.name == 'nt':
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE
+            
+            # PyInstaller'ı çalıştır
+            process = subprocess.Popen(
+                cmd,
+                cwd=exe_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                startupinfo=startupinfo,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+            )
+            
+            # Progress simülasyonu (PyInstaller çıktısı takip edilemediği için)
+            progress_values = [20, 30, 40, 50, 60, 70, 80, 85, 90]
+            messages = [
+                "Modüller analiz ediliyor...",
+                "Bağımlılıklar toplanıyor...",
+                "Python dosyaları derleniyor...",
+                "Kaynaklar paketleniyor...",
+                "EXE dosyası oluşturuluyor...",
+                "Bootloader ekleniyor...",
+                "Son düzenlemeler...",
+                "Dosya sıkıştırılıyor...",
+                "Neredeyse bitti..."
+            ]
+            
+            for i, (prog, msg) in enumerate(zip(progress_values, messages)):
+                if process.poll() is not None:
+                    break
+                self.root.after(0, lambda p=prog: self.build_progress.config(value=p))
+                self.root.after(0, lambda m=msg: self.build_detail.config(text=m))
+                time.sleep(12)  # Her aşama ~12 saniye (toplam ~2 dk)
+            
+            # İşlem bitmesini bekle
+            process.wait()
+            
+            # Aşama 4: Sonuç kontrol
+            new_exe = os.path.join(exe_dir, "dist", "XG-XRAY_V70.exe")
+            
+            if os.path.exists(new_exe):
+                self.root.after(0, lambda: self.build_status.config(text="📦 Dosyalar taşınıyor..."))
+                self.root.after(0, lambda: self.build_progress.config(value=95))
+                
+                # Eski EXE'yi sil ve yenisini taşı
+                if os.path.exists(old_exe):
+                    try:
+                        os.remove(old_exe)
+                    except:
+                        pass  # Çalışan EXE silinemez, sorun değil
+                
+                # Yeni EXE'yi ana dizine taşı
+                final_exe = os.path.join(exe_dir, "XG-XRAY_V70_YENI.exe")
+                shutil.move(new_exe, final_exe)
+                
+                # Temizlik
+                self.root.after(0, lambda: self.build_detail.config(text="Geçici dosyalar temizleniyor..."))
+                shutil.rmtree(build_dir, ignore_errors=True)
+                shutil.rmtree(dist_dir, ignore_errors=True)
+                if os.path.exists(spec_file):
+                    os.remove(spec_file)
+                
+                self.root.after(0, lambda: self.build_progress.config(value=100))
+                self.root.after(0, lambda: self.build_status.config(text="✅ GÜNCELLEME TAMAMLANDI!"))
+                self.root.after(0, lambda: self.build_detail.config(text=""))
+                
+                # Başarılı popup
+                self.root.after(500, lambda: self._guncelleme_basarili(final_exe, backup_exe))
+            else:
+                # Hata
+                self.root.after(0, lambda: self._build_hatasi("EXE dosyası oluşturulamadı"))
+                
+        except Exception as e:
+            self.root.after(0, lambda err=str(e): self._build_hatasi(err))
+    
+    def _guncelleme_basarili(self, new_exe, backup_exe):
+        """Güncelleme başarılı - yeni EXE'yi başlat"""
+        try:
+            self.build_popup.destroy()
+        except:
+            pass
         
-        # updater.bat oluştur
-        updater_path = os.path.join(exe_dir, "updater.bat")
-        with open(updater_path, 'w', encoding='utf-8') as f:
-            f.write(updater_content)
-        
-        # Kullanıcıya bilgi ver
-        messagebox.showinfo(
-            "🔄 Güncelleme Başlıyor",
-            "Şimdi bu program kapanacak ve\n"
-            "otomatik güncelleme başlayacak.\n\n"
-            "Lütfen açılan CMD penceresini\n"
-            "KAPATMAYIN ve bekleyin.\n\n"
-            "İşlem 2-3 dakika sürebilir."
+        cevap = messagebox.askyesno(
+            "🎉 Güncelleme Tamamlandı!",
+            "Yeni versiyon başarıyla oluşturuldu!\n\n"
+            f"📁 Yeni EXE: XG-XRAY_V70_YENI.exe\n\n"
+            "Şimdi yeni versiyonu başlatmak\n"
+            "ister misiniz?\n\n"
+            "(Bu program kapanacak)"
         )
         
-        # updater.bat'ı çalıştır ve programı kapat
-        import subprocess
-        subprocess.Popen(['cmd', '/c', 'start', '', updater_path], 
-                        cwd=exe_dir, shell=True)
-        
-        # Programı kapat
-        self.root.quit()
-    
-    def _py_calistir(self, py_path):
-        """Python dosyasını çalıştır"""
-        import subprocess
-        
-        try:
-            subprocess.Popen(["python", py_path])
-            messagebox.showinfo("✅ Başlatılıyor", 
-                "Yeni versiyon Python ile başlatılıyor.\n"
-                "Bu pencere kapanacak.")
+        if cevap:
+            import subprocess
+            subprocess.Popen([new_exe])
             self.root.quit()
-        except Exception as e:
-            messagebox.showerror("Hata", 
-                f"Python çalıştırılamadı:\n{e}\n\n"
-                f"Dosya konumu:\n{py_path}")
+        else:
+            messagebox.showinfo("Bilgi", 
+                f"Yeni EXE hazır:\n{new_exe}\n\n"
+                "İstediğiniz zaman çalıştırabilirsiniz.\n\n"
+                f"Eski versiyon yedeklendi:\n{backup_exe}")
+    
+    def _build_hatasi(self, hata):
+        """Build hatası"""
+        try:
+            self.build_popup.destroy()
+        except:
+            pass
+        
+        messagebox.showerror("❌ Güncelleme Hatası", 
+            f"EXE oluşturulurken hata oluştu:\n\n{hata}\n\n"
+            "Lütfen manuel olarak EXE oluşturun:\n"
+            "pyinstaller --onefile --windowed XG_XRAY_V70.py")
     
     def _exe_guncelleme_hata(self, hata):
         """EXE güncelleme hatası"""
