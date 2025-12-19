@@ -41,7 +41,7 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 # 🔄 VERSİYON VE GÜNCELLEME SİSTEMİ
 # ═══════════════════════════════════════════════════════════════════════════════
-APP_VERSION = "70.2.2"  # Major.Minor.Patch formatı
+APP_VERSION = "70.2.4"  # Major.Minor.Patch formatı
 APP_NAME = "XG-XRAY Commander"
 BUILD_DATE = "2025-12-19"
 
@@ -21907,7 +21907,12 @@ Sadece oranları listele, başka bir şey yazma."""
             self._guncelleme_indir()
     
     def _guncelleme_indir(self):
-        """GitHub'dan güncellemeyi indir - önce versiyon kontrolü yap"""
+        """GitHub'dan güncellemeyi indir - EXE ve Script için farklı çalışır"""
+        import sys
+        
+        # EXE modunda mı kontrol et
+        is_exe = getattr(sys, 'frozen', False)
+        
         self.lbl_update_status.config(text="🔍 Kontrol ediliyor...", fg="#ffff00")
         self.root.update()
         
@@ -21923,8 +21928,13 @@ Sadece oranları listele, başka bir şey yazma."""
                     if not self._versiyon_karsilastir(remote_version, APP_VERSION):
                         self.root.after(0, lambda: self._zaten_guncel())
                         return
+                    
+                    # EXE modunda farklı işlem yap
+                    if is_exe:
+                        self.root.after(0, lambda rv=remote_version: self._exe_guncelleme_baslat(rv))
+                        return
                 
-                # Güncelleme var, indir
+                # Script modunda normal güncelleme
                 self.root.after(0, lambda: self.lbl_update_status.config(
                     text="⬇️ İndiriliyor...", fg="#ffff00"))
                 
@@ -21978,6 +21988,240 @@ Sadece oranları listele, başka bir şey yazma."""
                     text=f"❌ Hata: {str(e)[:30]}", fg="#ff6666"))
         
         threading.Thread(target=indir_thread, daemon=True).start()
+    
+    def _exe_guncelleme_baslat(self, yeni_versiyon):
+        """EXE için güncelleme popup'ı ile indirme başlat"""
+        
+        # Progress popup oluştur
+        self.update_popup = tk.Toplevel(self.root)
+        self.update_popup.title("🔄 Güncelleme İndiriliyor")
+        self.update_popup.geometry("450x200")
+        self.update_popup.configure(bg=ModernTheme.BG_PRIMARY)
+        self.update_popup.transient(self.root)
+        self.update_popup.grab_set()
+        self.update_popup.resizable(False, False)
+        
+        # Ortala
+        self.update_popup.update_idletasks()
+        x = (self.update_popup.winfo_screenwidth() - 450) // 2
+        y = (self.update_popup.winfo_screenheight() - 200) // 2
+        self.update_popup.geometry(f"450x200+{x}+{y}")
+        
+        tk.Label(self.update_popup, text="🔄 GÜNCELLEME İNDİRİLİYOR", 
+                font=("Segoe UI", 14, "bold"),
+                bg=ModernTheme.BG_PRIMARY, fg=ModernTheme.ACCENT_PRIMARY).pack(pady=15)
+        
+        tk.Label(self.update_popup, text=f"v{APP_VERSION} → v{yeni_versiyon}", 
+                font=("Segoe UI", 11),
+                bg=ModernTheme.BG_PRIMARY, fg=ModernTheme.TEXT_PRIMARY).pack()
+        
+        self.update_progress_label = tk.Label(self.update_popup, text="Başlatılıyor...", 
+                bg=ModernTheme.BG_PRIMARY, fg=ModernTheme.TEXT_SECONDARY)
+        self.update_progress_label.pack(pady=10)
+        
+        # Progress bar
+        self.update_progress = ttk.Progressbar(self.update_popup, length=350, mode='determinate')
+        self.update_progress.pack(pady=10)
+        
+        # İndirme thread'i başlat
+        threading.Thread(target=lambda: self._exe_indir_thread(yeni_versiyon), daemon=True).start()
+    
+    def _exe_indir_thread(self, yeni_versiyon):
+        """EXE dosyasını indir ve updater oluştur"""
+        import sys
+        
+        try:
+            # Mevcut EXE yolu
+            current_exe = sys.executable
+            exe_dir = os.path.dirname(current_exe)
+            exe_name = os.path.basename(current_exe)
+            
+            # Yeni EXE için geçici isim
+            new_exe_path = os.path.join(exe_dir, "XG-XRAY_V70_UPDATE.exe")
+            
+            # GitHub'dan yeni .py dosyasını indir (EXE değil, çünkü GitHub'da EXE yok)
+            # Bunun yerine kullanıcıya script'i indirip EXE yapması gerektiğini söyleyelim
+            # VEYA GitHub Releases'dan EXE indirelim
+            
+            self.root.after(0, lambda: self.update_progress_label.config(text="📥 Dosya indiriliyor..."))
+            self.root.after(0, lambda: self.update_progress.config(value=20))
+            
+            # Changelog indir
+            changelog_text = ""
+            try:
+                changelog_response = requests.get(GITHUB_CHANGELOG_URL, timeout=10)
+                if changelog_response.status_code == 200:
+                    changelog_text = changelog_response.text
+                    changelog_file = os.path.join(BASE_DIR, "CHANGELOG.txt")
+                    with open(changelog_file, 'w', encoding='utf-8') as f:
+                        f.write(changelog_text)
+            except:
+                pass
+            
+            self.root.after(0, lambda: self.update_progress.config(value=40))
+            
+            # .py dosyasını indir
+            response = requests.get(GITHUB_RAW_URL, timeout=60)
+            
+            if response.status_code == 200:
+                self.root.after(0, lambda: self.update_progress_label.config(text="💾 Kaydediliyor..."))
+                self.root.after(0, lambda: self.update_progress.config(value=60))
+                
+                # Yeni .py dosyasını kaydet
+                new_py_path = os.path.join(exe_dir, "XG_XRAY_V70.py")
+                with open(new_py_path, 'w', encoding='utf-8') as f:
+                    f.write(response.text)
+                
+                self.root.after(0, lambda: self.update_progress.config(value=80))
+                
+                # Güncelleme flag'i oluştur
+                update_flag = os.path.join(BASE_DIR, ".update_installed")
+                with open(update_flag, 'w') as f:
+                    f.write(yeni_versiyon)
+                
+                self.root.after(0, lambda: self.update_progress.config(value=100))
+                self.root.after(0, lambda: self.update_progress_label.config(text="✅ İndirme tamamlandı!"))
+                
+                # Başarılı mesajı
+                self.root.after(500, lambda: self._exe_guncelleme_tamamlandi(new_py_path, exe_dir))
+            else:
+                self.root.after(0, lambda: self._exe_guncelleme_hata(f"İndirme hatası: {response.status_code}"))
+                
+        except Exception as e:
+            self.root.after(0, lambda err=str(e): self._exe_guncelleme_hata(err))
+    
+    def _exe_guncelleme_tamamlandi(self, py_path, exe_dir):
+        """EXE güncelleme tamamlandı - updater.bat ile otomatik EXE oluştur"""
+        import sys
+        
+        try:
+            self.update_popup.destroy()
+        except:
+            pass
+        
+        # Kullanıcıya seçenek sun
+        cevap = messagebox.askyesnocancel(
+            "✅ Güncelleme İndirildi!",
+            f"Yeni versiyon başarıyla indirildi!\n\n"
+            f"Ne yapmak istersiniz?\n\n"
+            f"[EVET] → Otomatik yeni EXE oluştur (2-3 dk bekler)\n"
+            f"[HAYIR] → .py dosyasını Python ile çalıştır\n"
+            f"[İPTAL] → Hiçbir şey yapma"
+        )
+        
+        if cevap is None:  # İptal
+            messagebox.showinfo("Bilgi", 
+                f"Güncelleme dosyası indirildi:\n{py_path}\n\n"
+                "İstediğiniz zaman çalıştırabilirsiniz.")
+            return
+        
+        if cevap:  # Evet - Otomatik EXE oluştur
+            self._exe_otomatik_olustur(py_path, exe_dir)
+        else:  # Hayır - Python ile çalıştır
+            self._py_calistir(py_path)
+    
+    def _exe_otomatik_olustur(self, py_path, exe_dir):
+        """Updater.bat ile otomatik EXE oluştur"""
+        import sys
+        
+        current_exe = sys.executable
+        
+        # updater.bat içeriği
+        updater_content = f'''@echo off
+chcp 65001 >nul
+echo ════════════════════════════════════════════════
+echo   XG-XRAY OTOMATIK GUNCELLEME
+echo ════════════════════════════════════════════════
+echo.
+echo Lutfen bekleyin, yeni EXE olusturuluyor...
+echo Bu islem 2-3 dakika surebilir.
+echo.
+
+cd /d "{exe_dir}"
+
+echo [1/4] Eski EXE yedekleniyor...
+if exist "XG-XRAY_V70_OLD.exe" del "XG-XRAY_V70_OLD.exe"
+if exist "XG-XRAY_V70.exe" ren "XG-XRAY_V70.exe" "XG-XRAY_V70_OLD.exe"
+
+echo [2/4] Yeni EXE olusturuluyor...
+pyinstaller --onefile --windowed --icon=eye_icon.ico --name "XG-XRAY_V70" XG_XRAY_V70.py
+
+echo [3/4] Dosyalar tasinıyor...
+if exist "dist\\XG-XRAY_V70.exe" (
+    move /Y "dist\\XG-XRAY_V70.exe" "XG-XRAY_V70.exe"
+    echo Yeni EXE basariyla olusturuldu!
+) else (
+    echo HATA: EXE olusturulamadi!
+    if exist "XG-XRAY_V70_OLD.exe" ren "XG-XRAY_V70_OLD.exe" "XG-XRAY_V70.exe"
+    pause
+    exit /b 1
+)
+
+echo [4/4] Temizlik yapiliyor...
+rmdir /s /q build 2>nul
+rmdir /s /q dist 2>nul
+del /q *.spec 2>nul
+if exist "XG-XRAY_V70_OLD.exe" del "XG-XRAY_V70_OLD.exe"
+
+echo.
+echo ════════════════════════════════════════════════
+echo   GUNCELLEME TAMAMLANDI!
+echo ════════════════════════════════════════════════
+echo.
+echo Program baslatiliyor...
+timeout /t 2 >nul
+
+start "" "XG-XRAY_V70.exe"
+exit
+'''
+        
+        # updater.bat oluştur
+        updater_path = os.path.join(exe_dir, "updater.bat")
+        with open(updater_path, 'w', encoding='utf-8') as f:
+            f.write(updater_content)
+        
+        # Kullanıcıya bilgi ver
+        messagebox.showinfo(
+            "🔄 Güncelleme Başlıyor",
+            "Şimdi bu program kapanacak ve\n"
+            "otomatik güncelleme başlayacak.\n\n"
+            "Lütfen açılan CMD penceresini\n"
+            "KAPATMAYIN ve bekleyin.\n\n"
+            "İşlem 2-3 dakika sürebilir."
+        )
+        
+        # updater.bat'ı çalıştır ve programı kapat
+        import subprocess
+        subprocess.Popen(['cmd', '/c', 'start', '', updater_path], 
+                        cwd=exe_dir, shell=True)
+        
+        # Programı kapat
+        self.root.quit()
+    
+    def _py_calistir(self, py_path):
+        """Python dosyasını çalıştır"""
+        import subprocess
+        
+        try:
+            subprocess.Popen(["python", py_path])
+            messagebox.showinfo("✅ Başlatılıyor", 
+                "Yeni versiyon Python ile başlatılıyor.\n"
+                "Bu pencere kapanacak.")
+            self.root.quit()
+        except Exception as e:
+            messagebox.showerror("Hata", 
+                f"Python çalıştırılamadı:\n{e}\n\n"
+                f"Dosya konumu:\n{py_path}")
+    
+    def _exe_guncelleme_hata(self, hata):
+        """EXE güncelleme hatası"""
+        try:
+            self.update_popup.destroy()
+        except:
+            pass
+        
+        messagebox.showerror("❌ Güncelleme Hatası", f"İndirme sırasında hata oluştu:\n\n{hata}")
+        self.lbl_update_status.config(text="❌ Güncelleme hatası", fg="#ff6666")
     
     def _zaten_guncel(self):
         """Zaten güncel mesajı"""
