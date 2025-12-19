@@ -2,30 +2,29 @@
 🎯 XG-XRAY COMMANDER - GÜNCELLEME NOTLARI
 ═══════════════════════════════════════════════════════════════
 
-📅 V70.2.8 (19.12.2025)
+📅 V70.2.9 (19.12.2025)
 ───────────────────────────────────────────────────────────────
-🎉 TAM OTOMATİK GÜNCELLEME SİSTEMİ!
+🔧 GÜNCELLEME SİSTEMİ - KARARLII VERSİYON
 
-Artık güncelleme tamamen otomatik:
+✅ Güncelleme akışı:
 1. "Güncelleme İndir" tıkla
-2. Progress bar ile indirmeyi izle
-3. Program kapanır
-4. Arka planda yeni EXE oluşturulur (2-3 dk)
-5. Yeni program otomatik açılır!
+2. Progress bar ile indirme
+3. "Güncelleme Tamamlandı!" mesajı
+4. Program kapanır
+5. Yeni versiyon otomatik açılır!
 
-✨ Hiç CMD penceresi açılmıyor
-✨ Hiç kullanıcı müdahalesi gerekmiyor
-✨ Hata durumunda eski sürüm geri yükleniyor
+📝 Not: Güncelleme sonrası program Python ile çalışır.
+       EXE oluşturmak için: pyinstaller komutu kullanın.
 
 ───────────────────────────────────────────────────────────────
 
-📅 V70.2.0 - V70.2.7
+📅 V70.2.0 - V70.2.8
 ───────────────────────────────────────────────────────────────
 • Sidebar kaydırma (mouse wheel)
 • Hoşgeldiniz mesajı
 • Profesyonel EXE ikonu
 • Güncelleme notları sistemi
-• Güncelleme sistemi geliştirmeleri
+• Çeşitli güncelleme sistemi denemeleri
 
 ───────────────────────────────────────────────────────────────
 
