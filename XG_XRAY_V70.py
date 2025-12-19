@@ -41,7 +41,7 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 # 🔄 VERSİYON VE GÜNCELLEME SİSTEMİ
 # ═══════════════════════════════════════════════════════════════════════════════
-APP_VERSION = "70.2.6"  # Major.Minor.Patch formatı
+APP_VERSION = "70.2.8"  # Major.Minor.Patch formatı
 APP_NAME = "XG-XRAY Commander"
 BUILD_DATE = "2025-12-19"
 
@@ -22091,7 +22091,7 @@ Sadece oranları listele, başka bir şey yazma."""
             self.root.after(0, lambda err=str(e): self._exe_guncelleme_hata(err))
     
     def _exe_guncelleme_tamamlandi(self, py_path, exe_dir):
-        """EXE güncelleme - arka planda otomatik EXE oluştur"""
+        """EXE güncelleme - TAM OTOMATİK! Program kapanır, batch EXE yapar, yeni program açılır"""
         import sys
         
         try:
@@ -22099,23 +22099,112 @@ Sadece oranları listele, başka bir şey yazma."""
         except:
             pass
         
-        # Onay al
-        cevap = messagebox.askyesno(
-            "✅ Güncelleme İndirildi!",
-            f"Yeni versiyon indirildi!\n\n"
-            f"Şimdi otomatik olarak yeni EXE oluşturulacak.\n"
-            f"Bu işlem 2-3 dakika sürebilir.\n\n"
-            f"Devam etmek istiyor musunuz?"
+        # Kullanıcıya bilgi ver
+        messagebox.showinfo(
+            "🔄 Güncelleme Kuruluyor",
+            "Güncelleme arka planda kurulacak.\n\n"
+            "⏳ Bu işlem 2-3 dakika sürecek.\n\n"
+            "Program şimdi kapanacak ve\n"
+            "güncelleme tamamlandığında\n"
+            "otomatik olarak yeniden açılacak.\n\n"
+            "Lütfen bekleyin..."
         )
         
-        if not cevap:
-            messagebox.showinfo("Bilgi", 
-                f"Güncelleme dosyası indirildi:\n{py_path}\n\n"
-                "İstediğiniz zaman manuel olarak EXE oluşturabilirsiniz.")
-            return
+        # Updater batch dosyası oluştur
+        self._updater_olustur_ve_calistir(py_path, exe_dir)
+    
+    def _updater_olustur_ve_calistir(self, py_path, exe_dir):
+        """Updater batch dosyası oluştur ve çalıştır, sonra programı kapat"""
+        import subprocess
         
-        # Arka planda EXE oluştur
-        self._exe_arka_planda_olustur(py_path, exe_dir)
+        # Python yolunu bul
+        python_path = self._find_python()
+        if not python_path:
+            python_path = "python"  # PATH'te olduğunu varsay
+        
+        # İkon yolu
+        icon_path = os.path.join(exe_dir, "eye_icon.ico")
+        icon_param = f'--icon="{icon_path}"' if os.path.exists(icon_path) else ""
+        
+        # Batch dosyası içeriği - TAMAMEN SESSIZ
+        batch_content = f'''@echo off
+chcp 65001 >nul 2>&1
+
+:: Programın kapanmasını bekle
+timeout /t 3 /nobreak >nul 2>&1
+
+:: Eski EXE'yi yedekle
+if exist "{exe_dir}\\XG-XRAY_V70_YEDEK.exe" del /f /q "{exe_dir}\\XG-XRAY_V70_YEDEK.exe" >nul 2>&1
+if exist "{exe_dir}\\XG-XRAY_V70.exe" ren "{exe_dir}\\XG-XRAY_V70.exe" "XG-XRAY_V70_YEDEK.exe" >nul 2>&1
+
+:: Eski build dosyalarını temizle
+if exist "{exe_dir}\\build" rmdir /s /q "{exe_dir}\\build" >nul 2>&1
+if exist "{exe_dir}\\dist" rmdir /s /q "{exe_dir}\\dist" >nul 2>&1
+if exist "{exe_dir}\\XG-XRAY_V70.spec" del /f /q "{exe_dir}\\XG-XRAY_V70.spec" >nul 2>&1
+
+:: PyInstaller ile yeni EXE oluştur
+cd /d "{exe_dir}"
+"{python_path}" -m PyInstaller --onefile --windowed {icon_param} --name "XG-XRAY_V70" "{py_path}" >nul 2>&1
+
+:: Başarılı mı kontrol et
+if exist "{exe_dir}\\dist\\XG-XRAY_V70.exe" (
+    :: Yeni EXE'yi ana dizine taşı
+    move /y "{exe_dir}\\dist\\XG-XRAY_V70.exe" "{exe_dir}\\XG-XRAY_V70.exe" >nul 2>&1
+    
+    :: Temizlik
+    rmdir /s /q "{exe_dir}\\build" >nul 2>&1
+    rmdir /s /q "{exe_dir}\\dist" >nul 2>&1
+    del /f /q "{exe_dir}\\XG-XRAY_V70.spec" >nul 2>&1
+    del /f /q "{exe_dir}\\XG-XRAY_V70_YEDEK.exe" >nul 2>&1
+    
+    :: Yeni programı başlat
+    start "" "{exe_dir}\\XG-XRAY_V70.exe"
+) else (
+    :: Hata durumunda eski EXE'yi geri yükle
+    if exist "{exe_dir}\\XG-XRAY_V70_YEDEK.exe" ren "{exe_dir}\\XG-XRAY_V70_YEDEK.exe" "XG-XRAY_V70.exe" >nul 2>&1
+    
+    :: Hata mesajı göster
+    msg * "Güncelleme başarısız oldu. Eski sürüm geri yüklendi."
+)
+
+:: Kendini sil
+del /f /q "%~f0" >nul 2>&1
+'''
+        
+        # Batch dosyasını oluştur
+        updater_path = os.path.join(exe_dir, "_updater_temp.bat")
+        with open(updater_path, 'w', encoding='utf-8') as f:
+            f.write(batch_content)
+        
+        # Batch'i TAMAMEN ARKA PLANDA başlat (hiç pencere açılmadan)
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
+        
+        # VBScript ile tamamen gizli çalıştır
+        vbs_content = f'''
+Set WshShell = CreateObject("WScript.Shell")
+WshShell.Run chr(34) & "{updater_path}" & chr(34), 0, False
+Set WshShell = Nothing
+'''
+        vbs_path = os.path.join(exe_dir, "_updater_launcher.vbs")
+        with open(vbs_path, 'w') as f:
+            f.write(vbs_content)
+        
+        # VBScript'i çalıştır (tamamen gizli)
+        subprocess.Popen(['wscript', vbs_path], 
+                        creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS)
+        
+        # Verileri kaydet
+        try:
+            self.db_kaydet()
+            self.ayarlar_kaydet()
+        except:
+            pass
+        
+        # Programı kapat
+        self.root.quit()
+        self.root.destroy()
     
     def _exe_arka_planda_olustur(self, py_path, exe_dir):
         """Arka planda PyInstaller ile EXE oluştur - progress bar ile"""
