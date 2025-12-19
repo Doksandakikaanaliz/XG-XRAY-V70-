@@ -41,7 +41,7 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 # 🔄 VERSİYON VE GÜNCELLEME SİSTEMİ
 # ═══════════════════════════════════════════════════════════════════════════════
-APP_VERSION = "70.1.2"  # Major.Minor.Patch formatı
+APP_VERSION = "70.2.0"  # Major.Minor.Patch formatı
 APP_NAME = "XG-XRAY Commander"
 BUILD_DATE = "2025-12-19"
 
@@ -4892,7 +4892,7 @@ class DashboardCard(tk.Frame):
 
 
 class ModernSidebar(tk.Frame):
-    """Modern sidebar navigasyonu"""
+    """Modern sidebar navigasyonu - Kaydırmalı"""
     def __init__(self, parent, on_select=None, **kwargs):
         super().__init__(parent, bg=ModernTheme.BG_SECONDARY, width=220, **kwargs)
         self.pack_propagate(False)
@@ -4900,16 +4900,66 @@ class ModernSidebar(tk.Frame):
         self.buttons = {}
         self.active = None
         
-        # Logo
+        # Logo (sabit - kaydırmaya dahil değil)
         logo_frame = tk.Frame(self, bg=ModernTheme.BG_SECONDARY)
-        logo_frame.pack(fill="x", pady=(20, 30))
+        logo_frame.pack(fill="x", pady=(20, 15))
         tk.Label(logo_frame, text="👁️", font=("Segoe UI", 32), bg=ModernTheme.BG_SECONDARY, fg=ModernTheme.ACCENT_PRIMARY).pack()
         tk.Label(logo_frame, text="XG-XRAY", font=("Segoe UI", 18, "bold"), bg=ModernTheme.BG_SECONDARY, fg=ModernTheme.TEXT_PRIMARY).pack()
         tk.Label(logo_frame, text="V70 THE ENDGAME", font=("Segoe UI", 9), bg=ModernTheme.BG_SECONDARY, fg=ModernTheme.TEXT_MUTED).pack()
         
-        # Menu container
-        self.menu_frame = tk.Frame(self, bg=ModernTheme.BG_SECONDARY)
-        self.menu_frame.pack(fill="both", expand=True)
+        # ═══════════════════════════════════════════════════════════════
+        # KAYDIRMALI MENÜ ALANI
+        # ═══════════════════════════════════════════════════════════════
+        
+        # Canvas ve Scrollbar container
+        self.scroll_container = tk.Frame(self, bg=ModernTheme.BG_SECONDARY)
+        self.scroll_container.pack(fill="both", expand=True)
+        
+        # Canvas oluştur
+        self.canvas = tk.Canvas(self.scroll_container, bg=ModernTheme.BG_SECONDARY, 
+                                highlightthickness=0, width=200)
+        self.canvas.pack(side="left", fill="both", expand=True)
+        
+        # İçerik frame'i (canvas içinde)
+        self.menu_frame = tk.Frame(self.canvas, bg=ModernTheme.BG_SECONDARY)
+        self.canvas_window = self.canvas.create_window((0, 0), window=self.menu_frame, anchor="nw")
+        
+        # Frame boyutu değişince canvas'ı güncelle
+        self.menu_frame.bind("<Configure>", self._on_frame_configure)
+        self.canvas.bind("<Configure>", self._on_canvas_configure)
+        
+        # Mouse wheel scroll
+        self.canvas.bind("<Enter>", self._bind_mousewheel)
+        self.canvas.bind("<Leave>", self._unbind_mousewheel)
+        self.menu_frame.bind("<Enter>", self._bind_mousewheel)
+        self.menu_frame.bind("<Leave>", self._unbind_mousewheel)
+    
+    def _on_frame_configure(self, event=None):
+        """Frame boyutu değişince scroll region güncelle"""
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+    
+    def _on_canvas_configure(self, event=None):
+        """Canvas boyutu değişince frame genişliğini ayarla"""
+        self.canvas.itemconfig(self.canvas_window, width=event.width)
+    
+    def _bind_mousewheel(self, event=None):
+        """Mouse wheel'i bağla"""
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.canvas.bind_all("<Button-4>", self._on_mousewheel)
+        self.canvas.bind_all("<Button-5>", self._on_mousewheel)
+    
+    def _unbind_mousewheel(self, event=None):
+        """Mouse wheel'i çöz"""
+        self.canvas.unbind_all("<MouseWheel>")
+        self.canvas.unbind_all("<Button-4>")
+        self.canvas.unbind_all("<Button-5>")
+    
+    def _on_mousewheel(self, event):
+        """Mouse wheel scroll"""
+        if event.num == 4 or event.delta > 0:
+            self.canvas.yview_scroll(-1, "units")
+        elif event.num == 5 or event.delta < 0:
+            self.canvas.yview_scroll(1, "units")
     
     def add_section(self, title):
         lbl = tk.Label(self.menu_frame, text=title.upper(), font=("Segoe UI", 9, "bold"),
@@ -7814,8 +7864,33 @@ class XrayCommanderV70:
         # V70: Başlangıçta sekmeleri senkronize et
         self.root.after(1000, self._sekme_senkronizasyonu)
         
+        # ═══════════════════════════════════════════════════════════════
+        # HOŞGELDİNİZ MESAJI VE BAŞLANGIÇ
+        # ═══════════════════════════════════════════════════════════════
+        self.root.after(500, self._hosgeldin_mesaji)
+        
         # Alarm kontrolü
         self.alarm_kontrol()
+    
+    def _hosgeldin_mesaji(self):
+        """Program açılışında hoşgeldiniz mesajı"""
+        from datetime import datetime
+        saat = datetime.now().hour
+        
+        if saat < 12:
+            selamlama = "Günaydın"
+        elif saat < 18:
+            selamlama = "İyi günler"
+        else:
+            selamlama = "İyi akşamlar"
+        
+        messagebox.showinfo(
+            "👋 Hoş Geldiniz!",
+            f"{selamlama}!\n\n"
+            f"🎯 XG-XRAY Commander V{APP_VERSION}\n"
+            f"📊 {len(self.mac_db)} maç arşivde\n\n"
+            f"Başarılı analizler dileriz! ⚽"
+        )
     
     def _fil_hafizasi_yukle(self):
         """V70: FİL HAFIZASI - mac_db'yi mac_arsivi sözlüğüne dönüştür"""
@@ -21659,10 +21734,84 @@ Sadece oranları listele, başka bir şey yazma."""
     # AYARLAR FONKSİYONLARI
     # ═══════════════════════════════════════════════════════════
     def tema_degistir(self, tema):
+        """Tema değiştir - ANINDA uygula"""
         self.current_theme = tema
         self.theme = THEMES[tema]
         self.ayarlar_kaydet()
-        messagebox.showinfo("Tema", f"✅ {tema} teması seçildi.\nDeğişikliklerin tamamı için uygulamayı yeniden başlatın.")
+        
+        # ═══════════════════════════════════════════════════════════════
+        # ANINDA TEMA DEĞİŞİKLİĞİ
+        # ═══════════════════════════════════════════════════════════════
+        try:
+            # ModernTheme sınıfını güncelle
+            if tema == "🌙 Koyu":
+                ModernTheme.BG_PRIMARY = "#0a0f1c"
+                ModernTheme.BG_SECONDARY = "#111827"
+                ModernTheme.BG_CARD = "#1e293b"
+                ModernTheme.TEXT_PRIMARY = "#ffffff"
+                ModernTheme.TEXT_SECONDARY = "#94a3b8"
+                ModernTheme.TEXT_MUTED = "#64748b"
+                ModernTheme.ACCENT_PRIMARY = "#3b82f6"
+            elif tema == "☀️ Açık":
+                ModernTheme.BG_PRIMARY = "#f8fafc"
+                ModernTheme.BG_SECONDARY = "#e2e8f0"
+                ModernTheme.BG_CARD = "#ffffff"
+                ModernTheme.TEXT_PRIMARY = "#1e293b"
+                ModernTheme.TEXT_SECONDARY = "#475569"
+                ModernTheme.TEXT_MUTED = "#94a3b8"
+                ModernTheme.ACCENT_PRIMARY = "#2563eb"
+            elif tema == "🔵 Mavi":
+                ModernTheme.BG_PRIMARY = "#0c1929"
+                ModernTheme.BG_SECONDARY = "#0f2744"
+                ModernTheme.BG_CARD = "#163a5f"
+                ModernTheme.TEXT_PRIMARY = "#e0f2fe"
+                ModernTheme.TEXT_SECONDARY = "#7dd3fc"
+                ModernTheme.TEXT_MUTED = "#38bdf8"
+                ModernTheme.ACCENT_PRIMARY = "#0ea5e9"
+            elif tema == "🟣 Mor":
+                ModernTheme.BG_PRIMARY = "#1a0a2e"
+                ModernTheme.BG_SECONDARY = "#2d1b4e"
+                ModernTheme.BG_CARD = "#3d2a5e"
+                ModernTheme.TEXT_PRIMARY = "#f3e8ff"
+                ModernTheme.TEXT_SECONDARY = "#c4b5fd"
+                ModernTheme.TEXT_MUTED = "#a78bfa"
+                ModernTheme.ACCENT_PRIMARY = "#8b5cf6"
+            
+            # Ana pencere
+            self.root.configure(bg=ModernTheme.BG_PRIMARY)
+            
+            # Tüm widget'ları recursive güncelle
+            self._update_widget_theme(self.root)
+            
+            messagebox.showinfo("✅ Tema Değişti", f"{tema} teması uygulandı!")
+            
+        except Exception as e:
+            print(f"Tema değiştirme hatası: {e}")
+            messagebox.showinfo("Tema", f"✅ {tema} teması seçildi.\nTam uygulama için programı yeniden başlatın.")
+    
+    def _update_widget_theme(self, widget):
+        """Widget ve alt widget'ların temasını güncelle"""
+        try:
+            widget_type = widget.winfo_class()
+            
+            if widget_type in ("Frame", "Labelframe"):
+                widget.configure(bg=ModernTheme.BG_PRIMARY)
+            elif widget_type == "Label":
+                widget.configure(bg=ModernTheme.BG_PRIMARY, fg=ModernTheme.TEXT_PRIMARY)
+            elif widget_type == "Button":
+                widget.configure(bg=ModernTheme.BG_CARD, fg=ModernTheme.TEXT_PRIMARY)
+            elif widget_type == "Entry":
+                widget.configure(bg=ModernTheme.BG_CARD, fg=ModernTheme.TEXT_PRIMARY)
+            elif widget_type == "Text":
+                widget.configure(bg=ModernTheme.BG_CARD, fg=ModernTheme.TEXT_PRIMARY)
+            elif widget_type == "Canvas":
+                widget.configure(bg=ModernTheme.BG_PRIMARY)
+        except:
+            pass
+        
+        # Alt widget'ları güncelle
+        for child in widget.winfo_children():
+            self._update_widget_theme(child)
     
     # ═══════════════════════════════════════════════════════════
     # 🔄 GÜNCELLEME SİSTEMİ FONKSİYONLARI
